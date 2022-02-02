@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@codahq/packs-sdk": "^0.8.0"
+  }
+}
