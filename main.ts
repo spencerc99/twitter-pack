@@ -28,23 +28,23 @@ function nextUrlFromResponse(
   }
 }
 
-// pack.setSystemAuthentication({
-//   // Replace HeaderBearerToken with an authentication type
-//   // besides OAuth2, CodaApiHeaderBearerToken, None and Various.
-//   type: coda.AuthenticationType.HeaderBearerToken,
-// });
-
-pack.setUserAuthentication({
-  type: coda.AuthenticationType.OAuth2,
-  authorizationUrl: "https://twitter.com/i/oauth2/authorize",
-  tokenUrl: "https://api.twitter.com/oauth2/token",
-  additionalParams: {
-    redirect_uri: "https://coda.io/packsAuth/oauth2",
-    code_challenge: "challenge",
-    code_challenge_method: "plain",
-  },
-  scopes: ["tweet.write", "tweet.read", "users.read"],
+pack.setSystemAuthentication({
+  // Replace HeaderBearerToken with an authentication type
+  // besides OAuth2, CodaApiHeaderBearerToken, None and Various.
+  type: coda.AuthenticationType.HeaderBearerToken,
 });
+
+// pack.setUserAuthentication({
+//   type: coda.AuthenticationType.OAuth2,
+//   authorizationUrl: "https://twitter.com/i/oauth2/authorize",
+//   tokenUrl: "https://api.twitter.com/oauth2/token",
+//   additionalParams: {
+//     redirect_uri: "https://coda.io/packsAuth/oauth2",
+//     code_challenge: "challenge",
+//     code_challenge_method: "plain",
+//   },
+//   scopes: ["tweet.write", "tweet.read", "users.read"],
+// });
 
 // This formula is used in the authentication definition in the manifest.
 // It returns a simple label for the current user's account so the account
@@ -59,32 +59,6 @@ pack.setUserAuthentication({
 //   };
 //   const response = await context.fetcher.fetch(request);
 //   return (response.body as GitHubUser).login;
-// });
-
-// i dont think possible for now since twitter still uses OAuth 1.0 for API
-// pack.setUserAuthentication({
-//   // Replace None with the authentication type that applies for your connection.
-//   type: coda.AuthenticationType.OAuth2,
-//   // As outlined in https://docs.github.com/en/free-pro-team@latest/developers/apps/authorizing-oauth-apps,
-//   // these are the urls for initiating OAuth authentication and doing token exchanged.
-//   authorizationUrl: 'https://api.twitter.com/oauth/authorize',
-//   tokenUrl: 'https://api.twitter.com/oauth/access_token',
-//   // When making authorized http requests, most services ask you to pass a header of this form:
-//   // `Authorization: Bearer <OAUTH-TOKEN>`
-//   // but GitHub asks you use:
-//   // `Authorization: token <OAUTH-TOKEN>`
-//   // so we specify a non-default tokenPrefix here.
-//   // tokenPrefix: 'token',
-//   // These are the GitHub-specific scopes the user will be prompted to authorize in order for
-//   // the functionality in this pack to succeed.
-//   // scopes: ['read:user', 'repo'],
-//   // This is a simple formula that makes an API call to GitHub to find the name of the
-//   // user associated with the OAuth access token. This name is used to label the Coda account
-//   // connection associated with these credentials throughout the Coda UI.
-//   // For example, a user may connect both a personal GitHub account and a work GitHub account to
-//   // Coda, and this formula will help those accounts be clearly labeled in Coda without
-//   // direct input from the user.
-//   getConnectionName,
 // });
 
 // schemas + types
@@ -296,7 +270,6 @@ async function getUser([handle]: any[], context: coda.ExecutionContext) {
 
 const CommonTweetFields = "created_at,conversation_id,geo,public_metrics";
 
-// test: curl  GET 'https://api.twitter.com/2/users/1161649573/tweets?expansions=author_id,attachments.media_keys&media.fields=url' -H "Authorization: Bearer AAAAAAAAAAAAAAAAAAAAAIkMRgEAAAAA9rEkgSwgOmmsGuct30Emqx67fWg%3DsMLCC6NxqNkkHLDQGeqax4r8l0d16WL7J6hMeD70kXlRcEacck"
 async function getProfileTweets(
   [id]: any[],
   context: coda.ExecutionContext,
@@ -370,11 +343,48 @@ async function getLikedTweets(
   };
 }
 
+async function getSearchTweets(
+  [query, mode]: any[],
+  context: coda.ExecutionContext,
+  continuation: coda.Continuation | undefined
+) {
+  const params = {
+    expansions: "author_id,attachments.media_keys",
+    "tweet.fields": CommonTweetFields,
+    "user.fields": "profile_image_url",
+    "media.fields": "url,media_key,type",
+    query,
+    max_results: 100,
+  };
+  const basePath = `/2/tweets/search/recent`;
+  let url = continuation
+    ? (continuation.nextUrl as string)
+    : apiUrl(basePath, params);
+
+  const response = await context.fetcher.fetch({ method: "GET", url });
+
+  const { data, includes } = response.body;
+  const annotationInfo = includes;
+  const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
+  const nextUrl = nextUrlFromResponse(basePath, params, response);
+  return {
+    result: results || [],
+    continuation: nextUrl ? { nextUrl } : undefined,
+  };
+}
+
 const userIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "userId",
   description:
     "The id for a Twitter user. Find by handle using https://codeofaninja.com/tools/find-twitter-id/",
+});
+
+const queryParameter = coda.makeParameter({
+  type: coda.ParameterType.String,
+  name: "query",
+  description:
+    "The query for a Twitter search. See https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query for more info on how to build a query",
 });
 
 pack.addSyncTable({
@@ -418,6 +428,23 @@ pack.addSyncTable({
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getProfileTweets(params, context, context.sync.continuation),
+  },
+});
+
+pack.addSyncTable({
+  name: "SearchTweets",
+  identityName: "SearchTweets",
+  schema: tweetSchema,
+  formula: {
+    name: "SearchTweets",
+    description: "Fetches tweets for a given search query.",
+
+    parameters: [queryParameter],
+
+    connectionRequirement: coda.ConnectionRequirement.None,
+
+    execute: (params, context) =>
+      getSearchTweets(params, context, context.sync.continuation),
   },
 });
 
@@ -580,17 +607,17 @@ pack.addColumnFormat({
   instructions: "Gets the user for a specific twitter handle",
 });
 
-pack.addFormula({
-  resultType: coda.ValueType.String,
-  name: "PostTweet",
-  description: "Post a tweet",
-  parameters: [
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "tweet",
-      description: "The tweet to post",
-    }),
-  ],
-  execute: postTweet,
-  connectionRequirement: coda.ConnectionRequirement.Required,
-});
+// pack.addFormula({
+//   resultType: coda.ValueType.String,
+//   name: "PostTweet",
+//   description: "Post a tweet",
+//   parameters: [
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "tweet",
+//       description: "The tweet to post",
+//     }),
+//   ],
+//   execute: postTweet,
+//   connectionRequirement: coda.ConnectionRequirement.Required,
+// });
