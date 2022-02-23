@@ -202,6 +202,7 @@ const tweetSchema = coda.makeObjectSchema({
     replyCount: { type: coda.ValueType.Number, fromKey: "reply_count" },
     quoteCount: { type: coda.ValueType.Number, fromKey: "quote_count" },
     media: { type: coda.ValueType.Array, items: mediaSchema },
+    url: { type: coda.ValueType.String, codaType: coda.ValueHintType.Url },
     // referencedTweets: {type: coda.ValueType.Array, items: referencedTweetSchema, fromKey: 'referenced_tweets'},
   },
   featured: ["text", "createdAt", "author"],
@@ -231,7 +232,10 @@ function parseTweet(
   const mediaKeys = attachments?.media_keys;
   const author = users?.find((u) => u.id === tweetInfo.author_id);
   const mediaForTweet = media?.filter((m) => mediaKeys?.includes(m.media_key));
-  return { ...tweetInfo, ...public_metrics, author, media: mediaForTweet };
+  const url = author.username
+    ? "twitter.com/" + author.username + "/status/" + tweetInfo.id
+    : undefined;
+  return { ...tweetInfo, ...public_metrics, author, media: mediaForTweet, url };
 }
 
 // in the form of https://pbs.twimg.com/profile_images/1356386881030680580/7WZgSya4_normal.jpg
@@ -258,6 +262,7 @@ const UserLookupFields =
 async function getUser([handle]: any[], context: coda.ExecutionContext) {
   const params = {
     "user.fields": UserLookupFields,
+    expansions: "pinned_tweet_id",
   };
   const basePath = `/2/users/by/username/${handle}`;
   let url = apiUrl(basePath, params);
