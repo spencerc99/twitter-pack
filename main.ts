@@ -265,7 +265,7 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
     expansions: "pinned_tweet_id",
   };
 
-  const handle = inputHandle.replaceAll("@").trim();
+  const handle = inputHandle.replace(/@/g, "").trim();
   const basePath = `/2/users/by/username/${handle}`;
   let url = apiUrl(basePath, params);
 
