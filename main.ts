@@ -259,11 +259,13 @@ function parseUser(
 const UserLookupFields =
   "description,location,profile_image_url,url,verified,username,public_metrics";
 
-async function getUser([handle]: any[], context: coda.ExecutionContext) {
+async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   const params = {
     "user.fields": UserLookupFields,
     expansions: "pinned_tweet_id",
   };
+
+  const handle = inputHandle.replaceAll("@").trim();
   const basePath = `/2/users/by/username/${handle}`;
   let url = apiUrl(basePath, params);
 
