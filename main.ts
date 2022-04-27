@@ -224,8 +224,15 @@ interface UserAnnotationInfo {
   pinnedTweetId?: string;
 }
 
+function parseTweetText(text: string): string {
+  return text
+    .replace(/\n/g, "<br/>")
+    .replace(/&amp;/g, "&")
+    .replace(/(https:\/\/t\.co.+)/g, "<a href='$1'>$1</a>");
+}
+
 function parseTweet(
-  { public_metrics, attachments, ...tweetInfo }: TwitterTweet,
+  { public_metrics, attachments, text, ...tweetInfo }: TwitterTweet,
   annotationInfo: TweetAnnotationInfo
 ) {
   const { users, media } = annotationInfo;
@@ -235,7 +242,15 @@ function parseTweet(
   const url = author.username
     ? "twitter.com/" + author.username + "/status/" + tweetInfo.id
     : undefined;
-  return { ...tweetInfo, ...public_metrics, author, media: mediaForTweet, url };
+  const transformedText = parseTweetText(text);
+  return {
+    ...tweetInfo,
+    text: transformedText,
+    ...public_metrics,
+    author,
+    media: mediaForTweet,
+    url,
+  };
 }
 
 // in the form of https://pbs.twimg.com/profile_images/1356386881030680580/7WZgSya4_normal.jpg
