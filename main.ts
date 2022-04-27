@@ -185,7 +185,7 @@ const tweetSchema = coda.makeObjectSchema({
   // The actual schema properties.
   properties: {
     id: { type: coda.ValueType.String },
-    text: { type: coda.ValueType.String },
+    text: { type: coda.ValueType.String, codaType: coda.ValueHintType.Html },
     createdAt: {
       type: coda.ValueType.String,
       fromKey: "created_at",
