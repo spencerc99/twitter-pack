@@ -34,17 +34,12 @@ pack.setSystemAuthentication({
   type: coda.AuthenticationType.HeaderBearerToken,
 });
 
-// pack.setUserAuthentication({
-//   type: coda.AuthenticationType.OAuth2,
-//   authorizationUrl: "https://twitter.com/i/oauth2/authorize",
-//   tokenUrl: "https://api.twitter.com/oauth2/token",
-//   additionalParams: {
-//     redirect_uri: "https://coda.io/packsAuth/oauth2",
-//     code_challenge: "challenge",
-//     code_challenge_method: "plain",
-//   },
-//   scopes: ["tweet.write", "tweet.read", "users.read"],
-// });
+pack.setUserAuthentication({
+  type: coda.AuthenticationType.OAuth2,
+  authorizationUrl: "https://twitter.com/i/oauth2/authorize",
+  tokenUrl: "https://api.twitter.com/2/oauth2/token",
+  scopes: ["tweet.write", "tweet.read", "users.read"],
+});
 
 // This formula is used in the authentication definition in the manifest.
 // It returns a simple label for the current user's account so the account
@@ -577,6 +572,9 @@ async function postTweet(
     body: JSON.stringify({
       text: tweet,
     }),
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
   console.log(JSON.stringify(response.body, null, 2));
   return "OK";
@@ -629,17 +627,18 @@ pack.addColumnFormat({
   instructions: "Gets the user for a specific twitter handle",
 });
 
-// pack.addFormula({
-//   resultType: coda.ValueType.String,
-//   name: "PostTweet",
-//   description: "Post a tweet",
-//   parameters: [
-//     coda.makeParameter({
-//       type: coda.ParameterType.String,
-//       name: "tweet",
-//       description: "The tweet to post",
-//     }),
-//   ],
-//   execute: postTweet,
-//   connectionRequirement: coda.ConnectionRequirement.Required,
-// });
+pack.addFormula({
+  resultType: coda.ValueType.String,
+  name: "PostTweet",
+  description: "Post a tweet",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweet",
+      description: "The tweet to post",
+    }),
+  ],
+  execute: postTweet,
+  connectionRequirement: coda.ConnectionRequirement.Required,
+  isAction: true,
+});
