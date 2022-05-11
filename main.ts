@@ -38,7 +38,7 @@ pack.setUserAuthentication({
   type: coda.AuthenticationType.OAuth2,
   authorizationUrl: "https://twitter.com/i/oauth2/authorize",
   tokenUrl: "https://api.twitter.com/2/oauth2/token",
-  scopes: ["tweet.write", "tweet.read", "users.read"],
+  scopes: ["tweet.read", "users.read", "bookmark.read"],
   useProofKeyForCodeExchange: true,
 });
 
@@ -115,6 +115,15 @@ interface TwitterMedia {
   // this should be an enum but whatever for now
   type: string;
 }
+
+const CommonTweetFields = "created_at,conversation_id,geo,public_metrics";
+const CommonTweetExpansions = "author_id,attachments.media_keys";
+const CommonTweetMediaFields = "url,media_key,type";
+const CommonTweetUserFields = "profile_image_url";
+
+const CommonUserExpansions = "pinned_tweet_id";
+const UserLookupFields =
+  "description,location,profile_image_url,url,verified,username,public_metrics";
 
 const userSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
@@ -264,13 +273,10 @@ function parseUser(
   };
 }
 
-const UserLookupFields =
-  "description,location,profile_image_url,url,verified,username,public_metrics";
-
 async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   const params = {
     "user.fields": UserLookupFields,
-    expansions: "pinned_tweet_id",
+    expansions: CommonUserExpansions,
   };
 
   const handle = inputHandle.replace(/@/g, "").trim();
@@ -283,8 +289,6 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   return parseUser(data);
 }
 
-const CommonTweetFields = "created_at,conversation_id,geo,public_metrics";
-
 async function getProfileTweets(
   [id]: any[],
   context: coda.ExecutionContext,
@@ -293,11 +297,11 @@ async function getProfileTweets(
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
   const params = {
-    expansions: "author_id,attachments.media_keys",
+    expansions: CommonTweetExpansions,
     "tweet.fields": CommonTweetFields,
-    "user.fields": "profile_image_url",
+    "user.fields": CommonTweetUserFields,
     // for some reason preview_image_url not working?
-    "media.fields": "url,media_key,type",
+    "media.fields": CommonTweetMediaFields,
     max_results: 100,
   };
   const basePath = `/2/users/${id}/tweets`;
@@ -334,10 +338,10 @@ async function getLikedTweets(
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
   const params = {
-    expansions: "author_id,attachments.media_keys",
+    expansions: CommonTweetExpansions,
     "tweet.fields": CommonTweetFields,
-    "user.fields": "profile_image_url",
-    "media.fields": "url,media_key,type",
+    "user.fields": CommonTweetUserFields,
+    "media.fields": CommonTweetMediaFields,
     max_results: 100,
   };
   const basePath = `/2/users/${id}/liked_tweets`;
@@ -364,10 +368,10 @@ async function getSearchTweets(
   continuation: coda.Continuation | undefined
 ) {
   const params = {
-    expansions: "author_id,attachments.media_keys",
+    expansions: CommonTweetExpansions,
     "tweet.fields": CommonTweetFields,
-    "user.fields": "profile_image_url",
-    "media.fields": "url,media_key,type",
+    "user.fields": CommonTweetUserFields,
+    "media.fields": CommonTweetMediaFields,
     query,
     max_results: 100,
   };
@@ -492,7 +496,7 @@ async function getUserFollowers(
   continuation: coda.Continuation | undefined
 ) {
   const params = {
-    expansions: "pinned_tweet_id",
+    expansions: CommonUserExpansions,
     "tweet.fields": CommonTweetFields,
     "user.fields": UserLookupFields,
     max_results: 1000,
@@ -501,7 +505,6 @@ async function getUserFollowers(
   let url = continuation
     ? (continuation.nextUrl as string)
     : apiUrl(basePath, params);
-  // context.logger.info('continuation: ' + continuation);
 
   const response = await context.fetcher.fetch({ method: "GET", url });
 
@@ -531,7 +534,7 @@ async function getUserFollowing(
   continuation: coda.Continuation | undefined
 ) {
   const params = {
-    expansions: "pinned_tweet_id",
+    expansions: CommonUserExpansions,
     "tweet.fields": CommonTweetFields,
     "user.fields": UserLookupFields,
     max_results: 1000,
@@ -563,6 +566,43 @@ async function getUserFollowing(
   };
 }
 
+async function getBookmarks(
+  [id]: any[],
+  context: coda.ExecutionContext,
+  continuation: coda.Continuation | undefined
+) {
+  const params = {
+    expansions: CommonTweetExpansions,
+    "tweet.fields": CommonTweetFields,
+    "user.fields": "profile_image_url",
+    "media.fields": CommonTweetMediaFields,
+  };
+  const basePath = `/2/users/${id}/bookmarks`;
+  let url = continuation
+    ? (continuation.nextUrl as string)
+    : apiUrl(basePath, params);
+
+  const response = await context.fetcher.fetch({ method: "GET", url });
+
+  const { data, includes } = response.body;
+  const annotationInfo = includes;
+  const results = data?.map((rawBookmark) =>
+    parseTweet(rawBookmark, annotationInfo)
+  );
+  const nextUrl = nextUrlFromResponse(basePath, params, response);
+  if (!results) {
+    console.log("No data found: " + JSON.stringify(response, null, 2));
+  } else {
+    console.log(
+      `Found ${results.length} bookmarks: ` + JSON.stringify(response, null, 2)
+    );
+  }
+  return {
+    result: results || [],
+    continuation: nextUrl ? { nextUrl } : undefined,
+  };
+}
+
 async function postTweet(
   [tweet]: any[],
   context: coda.ExecutionContext
@@ -573,9 +613,9 @@ async function postTweet(
     body: JSON.stringify({
       text: tweet,
     }),
-    // headers: {
-    //   "Content-Type": "application/json",
-    // },
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
   console.log(JSON.stringify(response.body, null, 2));
   return "OK";
@@ -644,4 +684,36 @@ pack.addFormula({
   execute: postTweet,
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
+  extraOAuthScopes: ["tweet.write"],
+});
+
+pack.addSyncTable({
+  // The display name for the table, shown in the UI.
+  name: "Bookmarks",
+  identityName: "Bookmarks",
+  schema: tweetSchema,
+  formula: {
+    // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
+    name: "Bookmarks",
+    description: "Fetches the bookmarks for the authenticated user.",
+
+    parameters: [],
+
+    // This indicates whether or not your sync table requires an account connection.
+    connectionRequirement: coda.ConnectionRequirement.Required,
+
+    // Everything inside this statement will execute anytime your Coda function is called in a doc.
+    execute: async (_params, context) => {
+      // first get the current authenticated user
+      const response = await context.fetcher.fetch({
+        url: apiUrl("/2/users/me"),
+        method: "GET",
+      });
+      const userId = response.body?.data?.id;
+      coda.ensureExists(userId, "Authenticated user not found.");
+
+      return getBookmarks([userId], context, context.sync.continuation);
+    },
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
 });
