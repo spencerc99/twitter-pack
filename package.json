@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "@codahq/packs-sdk": "^0.8.0"
+    "@codahq/packs-sdk": "https://github.com/coda/packs-sdk#23d81251ffabf33fef61732a40023e6a43ef0c12"
   }
 }

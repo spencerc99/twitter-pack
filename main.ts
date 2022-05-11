@@ -39,6 +39,7 @@ pack.setUserAuthentication({
   authorizationUrl: "https://twitter.com/i/oauth2/authorize",
   tokenUrl: "https://api.twitter.com/2/oauth2/token",
   scopes: ["tweet.write", "tweet.read", "users.read"],
+  useProofKeyForCodeExchange: true,
 });
 
 // This formula is used in the authentication definition in the manifest.
@@ -119,9 +120,6 @@ const userSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "id",
   primary: "username",
-  identity: {
-    name: "User",
-  },
   properties: {
     id: { type: coda.ValueType.String },
     name: { type: coda.ValueType.String },
@@ -424,6 +422,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getLikedTweets(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -446,6 +445,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getProfileTweets(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -463,6 +463,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getSearchTweets(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 // Here, we add a new formula to this Pack.
@@ -572,9 +573,9 @@ async function postTweet(
     body: JSON.stringify({
       text: tweet,
     }),
-    headers: {
-      "Content-Type": "application/json",
-    },
+    // headers: {
+    //   "Content-Type": "application/json",
+    // },
   });
   console.log(JSON.stringify(response.body, null, 2));
   return "OK";
@@ -598,6 +599,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getUserFollowers(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -618,6 +620,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getUserFollowing(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addColumnFormat({
