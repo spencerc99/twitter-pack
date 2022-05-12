@@ -684,7 +684,8 @@ pack.addFormula({
   execute: postTweet,
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
-  extraOAuthScopes: ["tweet.write"],
+  // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
+  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
 });
 
 /************************ */
@@ -776,7 +777,8 @@ pack.addFormula({
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
-  extraOAuthScopes: ["bookmark.write"],
+  // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
+  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
 });
 
 pack.addFormula({
@@ -803,7 +805,8 @@ pack.addFormula({
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
-  extraOAuthScopes: ["bookmark.write"],
+  // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
+  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
 });
 
 async function likeTweet(
@@ -860,7 +863,8 @@ pack.addFormula({
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
-  extraOAuthScopes: ["like.write"],
+  // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
+  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
 });
 
 pack.addFormula({
@@ -887,5 +891,6 @@ pack.addFormula({
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
-  extraOAuthScopes: ["like.write"],
+  // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
+  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
 });
