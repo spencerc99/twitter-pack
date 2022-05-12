@@ -687,6 +687,40 @@ pack.addFormula({
   extraOAuthScopes: ["tweet.write"],
 });
 
+/************************ */
+/*        BOOKMARKS       */
+/************************ */
+
+async function bookmarkTweet(
+  userId: string,
+  tweetId: string,
+  context: coda.ExecutionContext
+): Promise<boolean> {
+  const response = await context.fetcher.fetch({
+    method: "POST",
+    url: apiUrl(`/2/users/${userId}/bookmarks`),
+    body: JSON.stringify({
+      tweet_id: tweetId,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return Boolean(response.body?.data.bookmarked);
+}
+
+async function removeBookmark(
+  userId: string,
+  tweetId: string,
+  context: coda.ExecutionContext
+): Promise<boolean> {
+  const response = await context.fetcher.fetch({
+    method: "DELETE",
+    url: apiUrl(`/2/users/${userId}/bookmarks/${tweetId}`),
+  });
+  return Boolean(response.body?.data.bookmarked);
+}
+
 pack.addSyncTable({
   // The display name for the table, shown in the UI.
   name: "Bookmarks",
@@ -716,4 +750,142 @@ pack.addSyncTable({
     },
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
+});
+
+pack.addFormula({
+  resultType: coda.ValueType.Boolean,
+  name: "BookmarkTweet",
+  description: "Bookmarks a tweet",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweetId",
+      description: "The ID of the tweet to bookmark",
+    }),
+  ],
+  execute: async ([tweetId], context) => {
+    // first get the current authenticated user
+    const response = await context.fetcher.fetch({
+      url: apiUrl("/2/users/me"),
+      method: "GET",
+    });
+    const userId = response.body?.data?.id;
+    coda.ensureExists(userId, "Authenticated user not found.");
+
+    return bookmarkTweet(userId, tweetId, context);
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
+  isAction: true,
+  extraOAuthScopes: ["bookmark.write"],
+});
+
+pack.addFormula({
+  resultType: coda.ValueType.Boolean,
+  name: "RemoveBookmark",
+  description: "Unbookmarks a tweet",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweetId",
+      description: "The ID of the tweet to unbookmark",
+    }),
+  ],
+  execute: async ([tweetId], context) => {
+    // first get the current authenticated user
+    const response = await context.fetcher.fetch({
+      url: apiUrl("/2/users/me"),
+      method: "GET",
+    });
+    const userId = response.body?.data?.id;
+    coda.ensureExists(userId, "Authenticated user not found.");
+
+    return removeBookmark(userId, tweetId, context);
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
+  isAction: true,
+  extraOAuthScopes: ["bookmark.write"],
+});
+
+async function likeTweet(
+  userId: string,
+  tweetId: string,
+  context: coda.ExecutionContext
+): Promise<boolean> {
+  const response = await context.fetcher.fetch({
+    method: "POST",
+    url: apiUrl(`/2/users/${userId}/likes`),
+    body: JSON.stringify({
+      tweet_id: tweetId,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return Boolean(response.body?.data.liked);
+}
+
+async function unlikeTweet(
+  userId: string,
+  tweetId: string,
+  context: coda.ExecutionContext
+): Promise<boolean> {
+  const response = await context.fetcher.fetch({
+    method: "DELETE",
+    url: apiUrl(`/2/users/${userId}/likes/${tweetId}`),
+  });
+  return Boolean(response.body?.data.liked);
+}
+
+pack.addFormula({
+  resultType: coda.ValueType.Boolean,
+  name: "LikeTweet",
+  description: "Likes a tweet",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweetId",
+      description: "The ID of the tweet to bookmark",
+    }),
+  ],
+  execute: async ([tweetId], context) => {
+    // first get the current authenticated user
+    const response = await context.fetcher.fetch({
+      url: apiUrl("/2/users/me"),
+      method: "GET",
+    });
+    const userId = response.body?.data?.id;
+    coda.ensureExists(userId, "Authenticated user not found.");
+
+    return likeTweet(userId, tweetId, context);
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
+  isAction: true,
+  extraOAuthScopes: ["like.write"],
+});
+
+pack.addFormula({
+  resultType: coda.ValueType.Boolean,
+  name: "RemoveLike",
+  description: "Removes a like from a tweet",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweetId",
+      description: "The ID of the tweet to unlike",
+    }),
+  ],
+  execute: async ([tweetId], context) => {
+    // first get the current authenticated user
+    const response = await context.fetcher.fetch({
+      url: apiUrl("/2/users/me"),
+      method: "GET",
+    });
+    const userId = response.body?.data?.id;
+    coda.ensureExists(userId, "Authenticated user not found.");
+
+    return unlikeTweet(userId, tweetId, context);
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
+  isAction: true,
+  extraOAuthScopes: ["like.write"],
 });
