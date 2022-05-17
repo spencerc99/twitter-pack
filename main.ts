@@ -488,6 +488,7 @@ pack.addFormula({
   execute: getUser,
   resultType: coda.ValueType.Object,
   schema: userSchema,
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 async function getUserFollowers(
