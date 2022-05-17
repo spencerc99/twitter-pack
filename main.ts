@@ -28,6 +28,18 @@ function nextUrlFromResponse(
   }
 }
 
+// This formula is used in the authentication definition in the manifest.
+// It returns a simple label for the current user's account so the account
+// can be identified in the UI.
+const getConnectionName = coda.makeMetadataFormula(async (context) => {
+  const request: coda.FetchRequest = {
+    method: "GET",
+    url: apiUrl("/2/users/me"),
+  };
+  const response = await context.fetcher.fetch(request);
+  return response.body?.data?.username;
+});
+
 pack.setSystemAuthentication({
   // Replace HeaderBearerToken with an authentication type
   // besides OAuth2, CodaApiHeaderBearerToken, None and Various.
@@ -40,22 +52,8 @@ pack.setUserAuthentication({
   tokenUrl: "https://api.twitter.com/2/oauth2/token",
   scopes: ["tweet.read", "users.read", "bookmark.read"],
   useProofKeyForCodeExchange: true,
+  getConnectionName,
 });
-
-// This formula is used in the authentication definition in the manifest.
-// It returns a simple label for the current user's account so the account
-// can be identified in the UI.
-// export const getConnectionName = coda.makeMetadataFormula(async context => {
-//   const request: coda.FetchRequest = {
-//     method: 'GET',
-//     url: apiUrl('/user'),
-//     headers: {
-//       'Content-Type': 'application/json',
-//     },
-//   };
-//   const response = await context.fetcher.fetch(request);
-//   return (response.body as GitHubUser).login;
-// });
 
 // schemas + types
 interface ReferencedTweet {
@@ -430,13 +428,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.None,
+    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getLikedTweets(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -453,13 +450,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.None,
+    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getProfileTweets(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -477,7 +473,6 @@ pack.addSyncTable({
     execute: (params, context) =>
       getSearchTweets(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 // Here, we add a new formula to this Pack.
@@ -644,13 +639,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.None,
+    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowers(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -665,13 +659,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.None,
+    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowing(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addColumnFormat({
@@ -761,7 +754,6 @@ pack.addSyncTable({
       return getBookmarks([userId], context, context.sync.continuation);
     },
   },
-  connectionRequirement: coda.ConnectionRequirement.Required,
 });
 
 pack.addFormula({
