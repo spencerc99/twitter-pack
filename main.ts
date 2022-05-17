@@ -127,8 +127,11 @@ const UserLookupFields =
 
 const userSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  id: "id",
-  primary: "username",
+  idProperty: "id",
+  displayProperty: "username",
+  identity: {
+    name: "User",
+  },
   properties: {
     id: { type: coda.ValueType.String },
     name: { type: coda.ValueType.String },
@@ -148,7 +151,7 @@ const userSchema = coda.makeObjectSchema({
     tweetCount: { type: coda.ValueType.Number, fromKey: "tweet_count" },
     listedCount: { type: coda.ValueType.Number, fromKey: "listed_count" },
   },
-  featured: [
+  featuredProperties: [
     "name",
     "username",
     "description",
@@ -158,10 +161,21 @@ const userSchema = coda.makeObjectSchema({
   ],
 });
 
+const followerSchema = coda.makeObjectSchema({
+  ...userSchema,
+  identity: {
+    name: "FollowerUser",
+  },
+});
+const followingSchema = coda.makeObjectSchema({
+  ...userSchema,
+  identity: { name: "FollowingUser" },
+});
+
 const mediaSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  id: "mediaKey",
-  primary: "mediaKey",
+  idProperty: "mediaKey",
+  displayProperty: "mediaKey",
   properties: {
     mediaKey: { type: coda.ValueType.String, fromKey: "media_key" },
     type: { type: coda.ValueType.String },
@@ -171,19 +185,13 @@ const mediaSchema = coda.makeObjectSchema({
       codaType: coda.ValueHintType.ImageAttachment,
     },
   },
-  featured: ["mediaKey", "type", "imageUrl"],
+  featuredProperties: ["mediaKey", "type", "imageUrl"],
 });
 
 const tweetSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  // The property name from the properties object below that represents the unique
-  // identifier of this item. A sync table MUST have a stable unique identifier. Without
-  // one, each subsequent sync will wipe away all rows and recreate them from scratch.
-  id: "id",
-  // The property name from the properties object below that should label this item
-  // in the UI. All properties can be seen when hovering over a synced item in the UI,
-  // but the primary property value is shown on the chip representing the full object.
-  primary: "id",
+  idProperty: "id",
+  displayProperty: "id",
   // The actual schema properties.
   properties: {
     id: { type: coda.ValueType.String },
@@ -207,7 +215,7 @@ const tweetSchema = coda.makeObjectSchema({
     url: { type: coda.ValueType.String, codaType: coda.ValueHintType.Url },
     // referencedTweets: {type: coda.ValueType.Array, items: referencedTweetSchema, fromKey: 'referenced_tweets'},
   },
-  featured: ["text", "createdAt", "author"],
+  featuredProperties: ["text", "createdAt", "author"],
 });
 
 interface TweetAnnotationInfo {
@@ -272,6 +280,8 @@ function parseUser(
     ...public_metrics,
   };
 }
+
+// async function getTweet([tweetId]: any[], context: coda.ExecutionContext) {
 
 async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   const params = {
@@ -624,8 +634,8 @@ async function postTweet(
 
 pack.addSyncTable({
   name: "UserFollowers",
-  identityName: "UserFollowers",
-  schema: userSchema,
+  identityName: "FollowerUser",
+  schema: followerSchema,
   formula: {
     // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "UserFollowers",
@@ -645,8 +655,8 @@ pack.addSyncTable({
 
 pack.addSyncTable({
   name: "UserFollowing",
-  identityName: "UserFollowing",
-  schema: userSchema,
+  identityName: "FollowingUser",
+  schema: followingSchema,
   formula: {
     // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "UserFollowing",
