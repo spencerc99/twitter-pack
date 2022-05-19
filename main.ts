@@ -427,13 +427,12 @@ pack.addSyncTable({
 
     parameters: [userIdParameter],
 
-    // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.Optional,
-
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getLikedTweets(params, context, context.sync.continuation),
   },
+  // This indicates whether or not your sync table requires an account connection.
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -449,13 +448,12 @@ pack.addSyncTable({
 
     parameters: [userIdParameter],
 
-    // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.Optional,
-
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getProfileTweets(params, context, context.sync.continuation),
   },
+  // This indicates whether or not your sync table requires an account connection.
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -468,11 +466,10 @@ pack.addSyncTable({
 
     parameters: [queryParameter],
 
-    connectionRequirement: coda.ConnectionRequirement.None,
-
     execute: (params, context) =>
       getSearchTweets(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 // Here, we add a new formula to this Pack.
@@ -639,12 +636,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowers(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addSyncTable({
@@ -659,12 +656,12 @@ pack.addSyncTable({
     parameters: [userIdParameter],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.Optional,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowing(params, context, context.sync.continuation),
   },
+  connectionRequirement: coda.ConnectionRequirement.Optional,
 });
 
 pack.addColumnFormat({
@@ -739,7 +736,6 @@ pack.addSyncTable({
     parameters: [],
 
     // This indicates whether or not your sync table requires an account connection.
-    connectionRequirement: coda.ConnectionRequirement.Required,
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: async (_params, context) => {
@@ -754,6 +750,7 @@ pack.addSyncTable({
       return getBookmarks([userId], context, context.sync.continuation);
     },
   },
+  connectionRequirement: coda.ConnectionRequirement.Required,
 });
 
 pack.addFormula({
