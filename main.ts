@@ -432,7 +432,7 @@ pack.addSyncTable({
       getLikedTweets(params, context, context.sync.continuation),
   },
   // This indicates whether or not your sync table requires an account connection.
-  connectionRequirement: coda.ConnectionRequirement.Optional,
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 pack.addSyncTable({
@@ -453,7 +453,7 @@ pack.addSyncTable({
       getProfileTweets(params, context, context.sync.continuation),
   },
   // This indicates whether or not your sync table requires an account connection.
-  connectionRequirement: coda.ConnectionRequirement.Optional,
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 pack.addSyncTable({
@@ -641,7 +641,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getUserFollowers(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 pack.addSyncTable({
@@ -661,7 +661,7 @@ pack.addSyncTable({
     execute: (params, context) =>
       getUserFollowing(params, context, context.sync.continuation),
   },
-  connectionRequirement: coda.ConnectionRequirement.Optional,
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 pack.addColumnFormat({
