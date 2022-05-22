@@ -593,13 +593,38 @@ async function getBookmarks(
     parseTweet(rawBookmark, annotationInfo)
   );
   const nextUrl = nextUrlFromResponse(basePath, params, response);
-  if (!results) {
-    console.log("No data found: " + JSON.stringify(response, null, 2));
-  } else {
-    console.log(
-      `Found ${results.length} bookmarks: ` + JSON.stringify(response, null, 2)
-    );
-  }
+
+  return {
+    result: results || [],
+    continuation: nextUrl ? { nextUrl } : undefined,
+  };
+}
+
+async function getUserTimeline(
+  [id]: any[],
+  context: coda.ExecutionContext,
+  continuation: coda.Continuation | undefined
+) {
+  const params = {
+    expansions: CommonTweetExpansions,
+    "tweet.fields": CommonTweetFields,
+    "user.fields": "profile_image_url",
+    "media.fields": CommonTweetMediaFields,
+  };
+  const basePath = `/2/users/:id/timelines/reverse_chronological`;
+  let url = continuation
+    ? (continuation.nextUrl as string)
+    : apiUrl(basePath, params);
+
+  const response = await context.fetcher.fetch({ method: "GET", url });
+
+  const { data, includes } = response.body;
+  const annotationInfo = includes;
+  const results = data?.map((rawBookmark) =>
+    parseTweet(rawBookmark, annotationInfo)
+  );
+
+  const nextUrl = nextUrlFromResponse(basePath, params, response);
   return {
     result: results || [],
     continuation: nextUrl ? { nextUrl } : undefined,
@@ -748,6 +773,35 @@ pack.addSyncTable({
       coda.ensureExists(userId, "Authenticated user not found.");
 
       return getBookmarks([userId], context, context.sync.continuation);
+    },
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
+});
+
+pack.addSyncTable({
+  name: "UserTimeline",
+  identityName: "UserTimeline",
+  schema: tweetSchema,
+  formula: {
+    name: "UserTimeline",
+    description:
+      "Fetches the reverse chronological timeline for the authenticated user.",
+
+    parameters: [],
+
+    // This indicates whether or not your sync table requires an account connection.
+
+    // Everything inside this statement will execute anytime your Coda function is called in a doc.
+    execute: async (_params, context) => {
+      // first get the current authenticated user
+      const response = await context.fetcher.fetch({
+        url: apiUrl("/2/users/me"),
+        method: "GET",
+      });
+      const userId = response.body?.data?.id;
+      coda.ensureExists(userId, "Authenticated user not found.");
+
+      return getUserTimeline([userId], context, context.sync.continuation);
     },
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
