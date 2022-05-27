@@ -1,7 +1,5 @@
-// This import statement gives you access to all parts of the Coda Packs SDK.
 import * as coda from "@codahq/packs-sdk";
 
-// This line creates your new Pack.
 export const pack = coda.newPack();
 
 const baseApiUrl = "api.twitter.com";
@@ -41,16 +39,22 @@ const getConnectionName = coda.makeMetadataFormula(async (context) => {
 });
 
 pack.setSystemAuthentication({
-  // Replace HeaderBearerToken with an authentication type
-  // besides OAuth2, CodaApiHeaderBearerToken, None and Various.
   type: coda.AuthenticationType.HeaderBearerToken,
 });
+
+const OAuthScopesRead = ["tweet.read", "users.read", "bookmark.read"];
+const OAuthScopesReadWrite = [
+  ...OAuthScopesRead,
+  "tweet.write",
+  "bookmark.write",
+  "like.write",
+];
 
 pack.setUserAuthentication({
   type: coda.AuthenticationType.OAuth2,
   authorizationUrl: "https://twitter.com/i/oauth2/authorize",
   tokenUrl: "https://api.twitter.com/2/oauth2/token",
-  scopes: ["tweet.read", "users.read", "bookmark.read"],
+  scopes: OAuthScopesRead,
   useProofKeyForCodeExchange: true,
   getConnectionName,
 });
@@ -105,23 +109,32 @@ interface TwitterUser {
   verified?: boolean;
   profile_image_url?: string;
   public_metrics?: UserPublicMetrics;
+  created_at: string;
+}
+
+interface TwitterMediaVariant {
+  bit_rate?: number;
+  content_type: "video/mp4" | string;
+  url: string;
 }
 
 interface TwitterMedia {
   media_key: string;
-  url: string;
   // this should be an enum but whatever for now
   type: string;
+  url?: string;
+  preview_image_url?: string;
+  variants?: TwitterMediaVariant[];
 }
 
 const CommonTweetFields = "created_at,conversation_id,geo,public_metrics";
 const CommonTweetExpansions = "author_id,attachments.media_keys";
-const CommonTweetMediaFields = "url,media_key,type";
-const CommonTweetUserFields = "profile_image_url";
+const CommonTweetMediaFields = "url,media_key,type,preview_image_url,variants";
+const CommonTweetUserFields =
+  "description,location,profile_image_url,url,verified,username,public_metrics,created_at";
+const UserLookupFields = CommonTweetUserFields;
 
 const CommonUserExpansions = "pinned_tweet_id";
-const UserLookupFields =
-  "description,location,profile_image_url,url,verified,username,public_metrics";
 
 const userSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
@@ -142,6 +155,11 @@ const userSchema = coda.makeObjectSchema({
       type: coda.ValueType.String,
       fromKey: "profile_image_url",
       codaType: coda.ValueHintType.ImageReference,
+    },
+    createdAt: {
+      type: coda.ValueType.String,
+      fromKey: "created_at",
+      codaType: coda.ValueHintType.DateTime,
     },
     pinnedTweetId: { type: coda.ValueType.String, fromKey: "pinned_tweet_id" },
     followersCount: { type: coda.ValueType.Number, fromKey: "followers_count" },
@@ -173,24 +191,40 @@ const followingSchema = coda.makeObjectSchema({
 const mediaSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   idProperty: "mediaKey",
-  displayProperty: "mediaKey",
+  displayProperty: "imageUrl",
   properties: {
-    mediaKey: { type: coda.ValueType.String, fromKey: "media_key" },
+    mediaKey: {
+      type: coda.ValueType.String,
+      fromKey: "media_key",
+      required: true,
+    },
     type: { type: coda.ValueType.String },
     imageUrl: {
       type: coda.ValueType.String,
       fromKey: "url",
-      codaType: coda.ValueHintType.ImageAttachment,
+      codaType: coda.ValueHintType.ImageReference,
+      required: true,
+    },
+    videoUrl: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+    },
+    video: {
+      type: coda.ValueType.String,
+      fromKey: "videoUrl",
+      codaType: coda.ValueHintType.Embed,
     },
   },
   featuredProperties: ["mediaKey", "type", "imageUrl"],
 });
 
-const tweetSchema = coda.makeObjectSchema({
+const commonTweetSchema: any = {
   type: coda.ValueType.Object,
   idProperty: "id",
-  displayProperty: "id",
-  // The actual schema properties.
+  displayProperty: "text",
+  identity: {
+    name: "Tweet",
+  },
   properties: {
     id: { type: coda.ValueType.String },
     text: { type: coda.ValueType.String, codaType: coda.ValueHintType.Html },
@@ -213,8 +247,10 @@ const tweetSchema = coda.makeObjectSchema({
     url: { type: coda.ValueType.String, codaType: coda.ValueHintType.Url },
     // referencedTweets: {type: coda.ValueType.Array, items: referencedTweetSchema, fromKey: 'referenced_tweets'},
   },
-  featuredProperties: ["text", "createdAt", "author"],
-});
+  featuredProperties: ["text", "createdAt", "author", "media"],
+};
+
+const tweetSchema = coda.makeObjectSchema(commonTweetSchema);
 
 interface TweetAnnotationInfo {
   users?: TwitterUser[];
@@ -239,6 +275,19 @@ function parseTweetText(text: string): string {
     .replace(/(https:\/\/t\.co.+)/g, "<a href='$1'>$1</a>");
 }
 
+function parseMedia({
+  url,
+  preview_image_url,
+  variants,
+  ...rest
+}: TwitterMedia) {
+  return {
+    ...rest,
+    url: url ?? preview_image_url,
+    videoUrl: variants?.[0].url,
+  };
+}
+
 function parseTweet(
   { public_metrics, attachments, text, ...tweetInfo }: TwitterTweet,
   annotationInfo: TweetAnnotationInfo
@@ -248,15 +297,15 @@ function parseTweet(
   const author = users?.find((u) => u.id === tweetInfo.author_id);
   const mediaForTweet = media?.filter((m) => mediaKeys?.includes(m.media_key));
   const url = author.username
-    ? "twitter.com/" + author.username + "/status/" + tweetInfo.id
+    ? "https://twitter.com/" + author.username + "/status/" + tweetInfo.id
     : undefined;
   const transformedText = parseTweetText(text);
   return {
     ...tweetInfo,
     text: transformedText,
     ...public_metrics,
-    author,
-    media: mediaForTweet,
+    author: parseUser(author),
+    media: mediaForTweet.map(parseMedia),
     url,
   };
 }
@@ -279,7 +328,33 @@ function parseUser(
   };
 }
 
-// async function getTweet([tweetId]: any[], context: coda.ExecutionContext) {
+const TweetUrlRegex = /.*twitter.com\/[\w]+\/status\/([0-9]+)/;
+const TwitterHandleRegex = /^\w+$/;
+
+async function getTweet(
+  [tweetIdOrUrl]: string[],
+  context: coda.ExecutionContext
+) {
+  const maybeTweetIdMatch = tweetIdOrUrl.match(TweetUrlRegex)?.[1];
+  const tweetId = (maybeTweetIdMatch ?? tweetIdOrUrl).trim();
+
+  if (Number.isNaN(Number(tweetId))) {
+    throw new coda.UserVisibleError("Invalid tweet id");
+  }
+
+  const params = {
+    expansions: CommonTweetExpansions,
+    "tweet.fields": CommonTweetFields,
+    "user.fields": CommonTweetUserFields,
+    "media.fields": CommonTweetMediaFields,
+  };
+  const url = apiUrl(`/2/tweets/${tweetId}`, params);
+  const response = await context.fetcher.fetch({ method: "GET", url });
+
+  const { data, includes } = response.body;
+  const annotationInfo = includes;
+  return parseTweet(data, annotationInfo);
+}
 
 async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   const params = {
@@ -288,6 +363,10 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   };
 
   const handle = inputHandle.replace(/@/g, "").trim();
+  if (!TwitterHandleRegex.test(handle)) {
+    throw new coda.UserVisibleError("Invalid handle");
+  }
+
   const basePath = `/2/users/by/username/${handle}`;
   let url = apiUrl(basePath, params);
 
@@ -404,7 +483,7 @@ const userIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "userId",
   description:
-    "The id for a Twitter user. Find by handle using https://codeofaninja.com/tools/find-twitter-id/",
+    "The id, handle, or URL for a Twitter user. For example, '12312312312313' or 'spencerc99' or 'https://twitter.com/spencerc99'",
 });
 
 const queryParameter = coda.makeParameter({
@@ -418,8 +497,12 @@ pack.addSyncTable({
   // The display name for the table, shown in the UI.
   name: "LikedTweets",
   // The unique identifier for the table.
-  identityName: "LikedTweets",
-  schema: tweetSchema,
+  identityName: "LikedTweet",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "LikedTweet" },
+  }),
   formula: {
     // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "LikedTweets",
@@ -439,8 +522,12 @@ pack.addSyncTable({
   // The display name for the table, shown in the UI.
   name: "ProfileTweets",
   // The unique identifier for the table.
-  identityName: "ProfileTweets",
-  schema: tweetSchema,
+  identityName: "ProfileTweet",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "ProfileTweet" },
+  }),
   formula: {
     // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "ProfileTweets",
@@ -458,8 +545,12 @@ pack.addSyncTable({
 
 pack.addSyncTable({
   name: "SearchTweets",
-  identityName: "SearchTweets",
-  schema: tweetSchema,
+  identityName: "SearchTweet",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "SearchTweet" },
+  }),
   formula: {
     name: "SearchTweets",
     description: "Fetches tweets for a given search query.",
@@ -472,13 +563,9 @@ pack.addSyncTable({
   connectionRequirement: coda.ConnectionRequirement.None,
 });
 
-// Here, we add a new formula to this Pack.
 pack.addFormula({
-  // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
   name: "GetUser",
   description: "Gets information about a twitter user by handle.",
-  // If your formula requires one or more inputs, you’ll define them here.
-  // Here, we're creating a string input called “name”.
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -490,7 +577,26 @@ pack.addFormula({
   execute: getUser,
   resultType: coda.ValueType.Object,
   schema: userSchema,
-  connectionRequirement: coda.ConnectionRequirement.Optional,
+  // TODO(spencer): make this optional after fixing bug around column format
+  connectionRequirement: coda.ConnectionRequirement.None,
+});
+
+pack.addFormula({
+  name: "GetTweet",
+  description: "Gets information about a tweet by ID or URL.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweet",
+      description: "the tweet id or URL",
+    }),
+  ],
+
+  execute: getTweet,
+  resultType: coda.ValueType.Object,
+  schema: tweetSchema,
+  // TODO(spencer): make this optional after fixing bug around column format
+  connectionRequirement: coda.ConnectionRequirement.None,
 });
 
 async function getUserFollowers(
@@ -577,7 +683,7 @@ async function getBookmarks(
   const params = {
     expansions: CommonTweetExpansions,
     "tweet.fields": CommonTweetFields,
-    "user.fields": "profile_image_url",
+    "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
   };
   const basePath = `/2/users/${id}/bookmarks`;
@@ -608,10 +714,10 @@ async function getUserTimeline(
   const params = {
     expansions: CommonTweetExpansions,
     "tweet.fields": CommonTweetFields,
-    "user.fields": "profile_image_url",
+    "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
   };
-  const basePath = `/2/users/:id/timelines/reverse_chronological`;
+  const basePath = `/2/users/${id}/timelines/reverse_chronological`;
   let url = continuation
     ? (continuation.nextUrl as string)
     : apiUrl(basePath, params);
@@ -654,15 +760,11 @@ pack.addSyncTable({
   identityName: "FollowerUser",
   schema: followerSchema,
   formula: {
-    // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "UserFollowers",
     description: "Fetches the followers of a given user.",
 
     parameters: [userIdParameter],
 
-    // This indicates whether or not your sync table requires an account connection.
-
-    // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowers(params, context, context.sync.continuation),
   },
@@ -674,15 +776,11 @@ pack.addSyncTable({
   identityName: "FollowingUser",
   schema: followingSchema,
   formula: {
-    // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "UserFollowing",
     description: "Fetches the people following a given user.",
 
     parameters: [userIdParameter],
 
-    // This indicates whether or not your sync table requires an account connection.
-
-    // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
       getUserFollowing(params, context, context.sync.continuation),
   },
@@ -691,9 +789,12 @@ pack.addSyncTable({
 
 pack.addColumnFormat({
   name: "User",
-  formulaNamespace: "TwitterPack", // Will be removed shortly
   formulaName: "GetUser",
-  instructions: "Gets the user for a specific twitter handle",
+});
+
+pack.addColumnFormat({
+  name: "Tweet",
+  formulaName: "GetTweet",
 });
 
 pack.addFormula({
@@ -711,7 +812,7 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
-  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
+  extraOAuthScopes: OAuthScopesReadWrite,
 });
 
 /************************ */
@@ -749,20 +850,19 @@ async function removeBookmark(
 }
 
 pack.addSyncTable({
-  // The display name for the table, shown in the UI.
   name: "Bookmarks",
-  identityName: "Bookmarks",
-  schema: tweetSchema,
+  identityName: "Bookmark",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "Bookmark" },
+  }),
   formula: {
-    // This is the name that will be called in the formula builder. Remember, your formula name cannot have spaces in it.
     name: "Bookmarks",
     description: "Fetches the bookmarks for the authenticated user.",
 
     parameters: [],
 
-    // This indicates whether or not your sync table requires an account connection.
-
-    // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: async (_params, context) => {
       // first get the current authenticated user
       const response = await context.fetcher.fetch({
@@ -781,7 +881,11 @@ pack.addSyncTable({
 pack.addSyncTable({
   name: "UserTimeline",
   identityName: "UserTimeline",
-  schema: tweetSchema,
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "UserTimeline" },
+  }),
   formula: {
     name: "UserTimeline",
     description:
@@ -789,9 +893,6 @@ pack.addSyncTable({
 
     parameters: [],
 
-    // This indicates whether or not your sync table requires an account connection.
-
-    // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: async (_params, context) => {
       // first get the current authenticated user
       const response = await context.fetcher.fetch({
@@ -832,7 +933,7 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
-  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
+  extraOAuthScopes: OAuthScopesReadWrite,
 });
 
 pack.addFormula({
@@ -860,7 +961,7 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
-  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
+  extraOAuthScopes: OAuthScopesReadWrite,
 });
 
 async function likeTweet(
@@ -918,7 +1019,7 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
-  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
+  extraOAuthScopes: OAuthScopesReadWrite,
 });
 
 pack.addFormula({
@@ -946,5 +1047,5 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.Required,
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
-  extraOAuthScopes: ["tweet.write", "bookmark.write", "like.write"],
+  extraOAuthScopes: OAuthScopesReadWrite,
 });
