@@ -305,7 +305,7 @@ function parseTweet(
     text: transformedText,
     ...public_metrics,
     author: parseUser(author),
-    media: mediaForTweet.map(parseMedia),
+    media: mediaForTweet?.map(parseMedia),
     url,
   };
 }
