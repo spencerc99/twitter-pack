@@ -377,7 +377,7 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
 }
 
 async function getProfileTweets(
-  [id]: any[],
+  [userId, lastTweetId]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
@@ -389,9 +389,9 @@ async function getProfileTweets(
     "user.fields": CommonTweetUserFields,
     // for some reason preview_image_url not working?
     "media.fields": CommonTweetMediaFields,
-    max_results: 100,
+    max_results: 25,
   };
-  const basePath = `/2/users/${id}/tweets`;
+  const basePath = `/2/users/${userId}/tweets`;
   let url = continuation
     ? (continuation.nextUrl as string)
     : apiUrl(basePath, params);
@@ -402,6 +402,7 @@ async function getProfileTweets(
   const { data, includes } = response.body;
   const annotationInfo = includes;
   const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
+  const skipContinuation = results?.map((t) => t.id).includes(lastTweetId);
   const nextUrl = nextUrlFromResponse(basePath, params, response);
   if (!results) {
     console.log("No data found: " + JSON.stringify(response, null, 2));
@@ -413,12 +414,12 @@ async function getProfileTweets(
   }
   return {
     result: results || [],
-    continuation: nextUrl ? { nextUrl } : undefined,
+    continuation: nextUrl && !skipContinuation ? { nextUrl } : undefined,
   };
 }
 
 async function getLikedTweets(
-  [id]: any[],
+  [userId, lastTweetId]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
@@ -429,9 +430,9 @@ async function getLikedTweets(
     "tweet.fields": CommonTweetFields,
     "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
-    max_results: 100,
+    max_results: 25,
   };
-  const basePath = `/2/users/${id}/liked_tweets`;
+  const basePath = `/2/users/${userId}/liked_tweets`;
   let url = continuation
     ? (continuation.nextUrl as string)
     : apiUrl(basePath, params);
@@ -442,10 +443,12 @@ async function getLikedTweets(
   const { data, includes } = response.body;
   const annotationInfo = includes;
   const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
+  // Weird error here using structured builder to watch out for.
+  const skipContinuation = results?.map((t) => t.id).includes(lastTweetId);
   const nextUrl = nextUrlFromResponse(basePath, params, response);
   return {
     result: results || [],
-    continuation: nextUrl ? { nextUrl } : undefined,
+    continuation: nextUrl && !skipContinuation ? { nextUrl } : undefined,
   };
 }
 
@@ -460,7 +463,7 @@ async function getSearchTweets(
     "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
     query,
-    max_results: 100,
+    max_results: 20,
   };
   const basePath = `/2/tweets/search/recent`;
   let url = continuation
@@ -493,6 +496,14 @@ const queryParameter = coda.makeParameter({
     "The query for a Twitter search. See https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query for more info on how to build a query",
 });
 
+const lastTweetIdParameter = coda.makeParameter({
+  type: coda.ParameterType.String,
+  name: "lastTweetId",
+  description:
+    "An optional parameter to preserve tweet pulling quota and avoid rate limiting. This should be the id of the last liked tweet that was returned by the previous sync. This will be used to stop syncing new tweets and return faster. If this parameter is not provided, the function will start from the beginning of the liked tweets list.",
+  optional: true,
+});
+
 pack.addSyncTable({
   // The display name for the table, shown in the UI.
   name: "LikedTweets",
@@ -508,7 +519,7 @@ pack.addSyncTable({
     name: "LikedTweets",
     description: "Fetches the tweets that a given user has liked.",
 
-    parameters: [userIdParameter],
+    parameters: [userIdParameter, lastTweetIdParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
@@ -533,7 +544,7 @@ pack.addSyncTable({
     name: "ProfileTweets",
     description: "Fetches the tweets that for a given user.",
 
-    parameters: [userIdParameter],
+    parameters: [userIdParameter, lastTweetIdParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
