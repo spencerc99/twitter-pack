@@ -376,11 +376,27 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
   return parseUser(data);
 }
 
+function parseDateParameter(date?: Date): [string, string] {
+  let startTime;
+  let endTime;
+  if (date) {
+    const startDate = new Date(date as Date);
+    startDate.setUTCHours(0, 0, 0, 0);
+    const endDate = new Date(date as Date);
+    endDate.setUTCHours(23, 59, 59, 0);
+    startTime = startDate.toISOString();
+    endTime = endDate.toISOString();
+  }
+  return [startTime, endTime];
+}
+
 async function getProfileTweets(
-  [userId, lastTweetId]: any[],
+  [userId, lastTweetId, date]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
+  const [startTime, endTime] = parseDateParameter(date);
+
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
   const params = {
@@ -390,6 +406,8 @@ async function getProfileTweets(
     // for some reason preview_image_url not working?
     "media.fields": CommonTweetMediaFields,
     max_results: 25,
+    ...(lastTweetId ? { since_id: lastTweetId } : {}),
+    ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
   const basePath = `/2/users/${userId}/tweets`;
   let url = continuation
@@ -402,7 +420,6 @@ async function getProfileTweets(
   const { data, includes } = response.body;
   const annotationInfo = includes;
   const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
-  const skipContinuation = results?.map((t) => t.id).includes(lastTweetId);
   const nextUrl = nextUrlFromResponse(basePath, params, response);
   if (!results) {
     console.log("No data found: " + JSON.stringify(response, null, 2));
@@ -414,15 +431,16 @@ async function getProfileTweets(
   }
   return {
     result: results || [],
-    continuation: nextUrl && !skipContinuation ? { nextUrl } : undefined,
+    continuation: nextUrl ? { nextUrl } : undefined,
   };
 }
 
 async function getLikedTweets(
-  [userId, lastTweetId]: any[],
+  [userId, lastTweetId, date]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
+  const [startTime, endTime] = parseDateParameter(date);
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
   const params = {
@@ -431,6 +449,8 @@ async function getLikedTweets(
     "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
     max_results: 25,
+    ...(lastTweetId ? { since_id: lastTweetId } : {}),
+    ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
   const basePath = `/2/users/${userId}/liked_tweets`;
   let url = continuation
@@ -444,11 +464,10 @@ async function getLikedTweets(
   const annotationInfo = includes;
   const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
   // Weird error here using structured builder to watch out for.
-  const skipContinuation = results?.map((t) => t.id).includes(lastTweetId);
   const nextUrl = nextUrlFromResponse(basePath, params, response);
   return {
     result: results || [],
-    continuation: nextUrl && !skipContinuation ? { nextUrl } : undefined,
+    continuation: nextUrl ? { nextUrl } : undefined,
   };
 }
 
@@ -500,7 +519,15 @@ const lastTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "lastTweetId",
   description:
-    "An optional parameter to preserve tweet pulling quota and avoid rate limiting. This should be the id of the last liked tweet that was returned by the previous sync. This will be used to stop syncing new tweets and return faster. If this parameter is not provided, the function will start from the beginning of the liked tweets list.",
+    'The ID of a tweet which will filter results to everything that comes later than this tweet. If this parameter is not provided, the function will sync everything which is performance intensive. Recommended to be used in conjunction with the "keep unsynced rows" option to preserve tweet pulling quota and avoid rate limiting of your doc.',
+  optional: true,
+});
+
+const dateParameter = coda.makeParameter({
+  type: coda.ParameterType.Date,
+  name: "date",
+  description:
+    'A date to filter for tweets posted on that date. If this parameter is not provided, the function will sync everything which is performance intensive. Recommended to be used in conjunction with the "keep unsynced rows" option to preserve tweet pulling quota and avoid rate limiting of your doc.',
   optional: true,
 });
 
@@ -519,7 +546,7 @@ pack.addSyncTable({
     name: "LikedTweets",
     description: "Fetches the tweets that a given user has liked.",
 
-    parameters: [userIdParameter, lastTweetIdParameter],
+    parameters: [userIdParameter, lastTweetIdParameter, dateParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
@@ -544,7 +571,7 @@ pack.addSyncTable({
     name: "ProfileTweets",
     description: "Fetches the tweets that for a given user.",
 
-    parameters: [userIdParameter, lastTweetIdParameter],
+    parameters: [userIdParameter, lastTweetIdParameter, dateParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
