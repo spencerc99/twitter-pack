@@ -166,6 +166,7 @@ const userSchema = coda.makeObjectSchema({
     followingCount: { type: coda.ValueType.Number, fromKey: "following_count" },
     tweetCount: { type: coda.ValueType.Number, fromKey: "tweet_count" },
     listedCount: { type: coda.ValueType.Number, fromKey: "listed_count" },
+    protected: { type: coda.ValueType.Boolean },
   },
   featuredProperties: [
     "name",
