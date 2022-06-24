@@ -436,11 +436,12 @@ async function getProfileTweets(
 }
 
 async function getLikedTweets(
-  [userId, lastTweetId, date]: any[],
+  [userId, lastTweetId]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
-  const [startTime, endTime] = parseDateParameter(date);
+  // Not currently accepted either.
+  // const [startTime, endTime] = parseDateParameter(date);
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
   const params = {
@@ -449,8 +450,9 @@ async function getLikedTweets(
     "user.fields": CommonTweetUserFields,
     "media.fields": CommonTweetMediaFields,
     max_results: 25,
-    ...(lastTweetId ? { since_id: lastTweetId } : {}),
-    ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
+    // Apparently this is not accepted as a parameter lol
+    // ...(lastTweetId ? { since_id: lastTweetId } : {}),
+    // ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
   const basePath = `/2/users/${userId}/liked_tweets`;
   let url = continuation
@@ -464,10 +466,11 @@ async function getLikedTweets(
   const annotationInfo = includes;
   const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
   // Weird error here using structured builder to watch out for.
+  const skipContinuation = results?.map((t) => t.id).includes(lastTweetId);
   const nextUrl = nextUrlFromResponse(basePath, params, response);
   return {
     result: results || [],
-    continuation: nextUrl ? { nextUrl } : undefined,
+    continuation: nextUrl && !skipContinuation ? { nextUrl } : undefined,
   };
 }
 
@@ -546,7 +549,7 @@ pack.addSyncTable({
     name: "LikedTweets",
     description: "Fetches the tweets that a given user has liked.",
 
-    parameters: [userIdParameter, lastTweetIdParameter, dateParameter],
+    parameters: [userIdParameter, lastTweetIdParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
