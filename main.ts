@@ -131,7 +131,7 @@ const CommonTweetFields = "created_at,conversation_id,geo,public_metrics";
 const CommonTweetExpansions = "author_id,attachments.media_keys";
 const CommonTweetMediaFields = "url,media_key,type,preview_image_url,variants";
 const CommonTweetUserFields =
-  "description,location,profile_image_url,url,verified,username,public_metrics,created_at";
+  "description,location,profile_image_url,url,verified,username,public_metrics,created_at,protected";
 const UserLookupFields = CommonTweetUserFields;
 
 const CommonUserExpansions = "pinned_tweet_id";
