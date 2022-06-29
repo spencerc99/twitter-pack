@@ -832,11 +832,13 @@ pack.addSyncTable({
 pack.addColumnFormat({
   name: "User",
   formulaName: "GetUser",
+  matchers: [/^https:\/\/\w+.twitter.com\/@?(\w)$/],
 });
 
 pack.addColumnFormat({
   name: "Tweet",
   formulaName: "GetTweet",
+  matchers: [/^https:\/\/\w+.twitter.com\/@?(\w)\/status\/\d+$/],
 });
 
 pack.addFormula({
