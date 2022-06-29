@@ -329,7 +329,10 @@ function parseUser(
   };
 }
 
-const TweetUrlRegex = /.*twitter.com\/[\w]+\/status\/([0-9]+)/;
+// https://twitter.com/spencerc99
+const TweetUserUrlRegex = /^.*twitter\.com\/@?(\w+)\??[^\/]*\/?$/;
+// https://twitter.com/spencerc99/status/1541857534234984450
+const TweetUrlRegex = /^.*twitter\.com\/@?\w+\/status\/(\d+)\??[^\/]*\/?$/;
 const TwitterHandleRegex = /^\w+$/;
 
 async function getTweet(
@@ -363,7 +366,8 @@ async function getUser([inputHandle]: any[], context: coda.ExecutionContext) {
     expansions: CommonUserExpansions,
   };
 
-  const handle = inputHandle.replace(/@/g, "").trim();
+  const maybeHandleMatch = inputHandle.match(TweetUserUrlRegex)?.[1];
+  const handle = (maybeHandleMatch ?? inputHandle).replace(/@/g, "").trim();
   if (!TwitterHandleRegex.test(handle)) {
     throw new coda.UserVisibleError("Invalid handle");
   }
@@ -832,13 +836,13 @@ pack.addSyncTable({
 pack.addColumnFormat({
   name: "User",
   formulaName: "GetUser",
-  matchers: [/^https:\/\/\w+.twitter.com\/@?(\w)$/],
+  matchers: [TweetUserUrlRegex],
 });
 
 pack.addColumnFormat({
   name: "Tweet",
   formulaName: "GetTweet",
-  matchers: [/^https:\/\/\w+.twitter.com\/@?(\w)\/status\/\d+$/],
+  matchers: [TweetUrlRegex],
 });
 
 pack.addFormula({
