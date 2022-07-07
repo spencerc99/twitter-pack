@@ -42,7 +42,12 @@ pack.setSystemAuthentication({
   type: coda.AuthenticationType.HeaderBearerToken,
 });
 
-const OAuthScopesRead = ["tweet.read", "users.read", "bookmark.read"];
+const OAuthScopesRead = [
+  "offline.access",
+  "tweet.read",
+  "users.read",
+  "bookmark.read",
+];
 const OAuthScopesReadWrite = [
   ...OAuthScopesRead,
   "tweet.write",
