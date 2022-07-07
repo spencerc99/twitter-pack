@@ -692,11 +692,12 @@ pack.addFormula({
 
   resultType: coda.ValueType.String,
   codaType: coda.ValueHintType.Url,
+  connectionRequirement: coda.ConnectionRequirement.None,
 
   execute: async function ([text, url, via, inReplyTo, hashtags]) {
     return coda.withQueryParams(`https://twitter.com/intent/tweet`, {
-      text: encodeURIComponent(text),
-      url: url ? encodeURIComponent(url) : undefined,
+      text,
+      url,
       hashtags: hashtags ? hashtags.join(",") : undefined,
       via: via ? via.replace(/@/g, "").trim() : undefined,
       in_reply_to: inReplyTo,
