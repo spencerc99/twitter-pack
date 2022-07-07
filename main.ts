@@ -645,6 +645,60 @@ pack.addFormula({
   connectionRequirement: coda.ConnectionRequirement.None,
 });
 
+pack.addFormula({
+  name: "GetDraftTweetLink",
+  description: "Creates a link to draft a pre-populated tweet.",
+
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "draft text",
+      description:
+        "The text to seed the draft with. User will be allowed the tweet to modify before posting",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      optional: true,
+      name: "url",
+      description:
+        "Optional. A fully-qualified URL with a HTTP or HTTPS scheme. The provided URL will be shortened by Twitter’s t.co to preserve character length.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      optional: true,
+      name: "via",
+      description:
+        "Optional. A Twitter username to associate with the Tweet, such as your site’s Twitter account. The provided username will be appended to the end of the Tweet with the text “via @username”. A logged-out Twitter user will be encouraged to sign-in or join Twitter to engage with the via account’s Tweets. The account may be suggested as an account to follow after the user posts a Tweet.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      optional: true,
+      name: "in reply to",
+      description: "Optional. ID of a tweet to reply to.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      optional: true,
+      name: "hashtags",
+      description:
+        "Optional. Allow easy discovery of Tweets by topic by including a comma-separated list of hashtag values without the preceding # character.",
+    }),
+  ],
+
+  resultType: coda.ValueType.String,
+  codaType: coda.ValueHintType.Url,
+
+  execute: async function ([text, url, via, inReplyTo, hashtags]) {
+    return coda.withQueryParams(`https://twitter.com/intent/tweet`, {
+      text: encodeURIComponent(text),
+      url: url ? encodeURIComponent(url) : undefined,
+      hashtags: hashtags ? hashtags.join(",") : undefined,
+      via: via ? via.replace(/@/g, "").trim() : undefined,
+      in_reply_to: inReplyTo,
+    });
+  },
+});
+
 async function getUserFollowers(
   [id]: any[],
   context: coda.ExecutionContext,
