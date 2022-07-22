@@ -843,15 +843,18 @@ async function getUserTimeline(
   };
 }
 
+
 async function postTweet(
   [tweet]: any[],
-  context: coda.ExecutionContext
+  context: coda.ExecutionContext,
+  [file]: media
 ): Promise<string> {
   const response = await context.fetcher.fetch({
     method: "POST",
     url: apiUrl("/2/tweets"),
     body: JSON.stringify({
       text: tweet,
+      media: media,
     }),
     headers: {
       "Content-Type": "application/json",
@@ -915,6 +918,9 @@ pack.addFormula({
       name: "tweet",
       description: "The tweet to post",
     }),
+      coda.makeParameter({
+        type:
+      }),
   ],
   execute: postTweet,
   connectionRequirement: coda.ConnectionRequirement.Required,

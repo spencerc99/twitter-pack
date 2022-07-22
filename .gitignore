@@ -1,3 +1,5 @@
 node_modules/
 test-urls
 .coda.json
+.idea/
+.gitpod.yml
