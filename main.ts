@@ -188,10 +188,18 @@ const followerSchema = coda.makeObjectSchema({
   identity: {
     name: "FollowerUser",
   },
+  properties: {
+    ...userSchema.properties,
+    sourceUserId: { type: coda.ValueType.String },
+  },
 });
 const followingSchema = coda.makeObjectSchema({
   ...userSchema,
   identity: { name: "FollowingUser" },
+  properties: {
+    ...userSchema.properties,
+    sourceUserId: { type: coda.ValueType.String },
+  },
 });
 
 const mediaSchema = coda.makeObjectSchema({
@@ -532,7 +540,7 @@ const lastTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "lastTweetId",
   description:
-    'The ID of a tweet which will filter results to everything that comes later than this tweet. If this parameter is not provided, the function will sync everything which is performance intensive. Recommended to be used in conjunction with the "keep unsynced rows" option to preserve tweet pulling quota and avoid rate limiting of your doc.',
+    'The ID of a tweet to filter results to only show results after. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
 });
 
@@ -540,7 +548,7 @@ const dateParameter = coda.makeParameter({
   type: coda.ParameterType.Date,
   name: "date",
   description:
-    'A date to filter for tweets posted on that date. If this parameter is not provided, the function will sync everything which is performance intensive. Recommended to be used in conjunction with the "keep unsynced rows" option to preserve tweet pulling quota and avoid rate limiting of your doc.',
+    'A date to filter for tweets posted on that date. If not provided, the function will sync everything which is performance intensive. Recommended to be used in conjunction with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
 });
 
@@ -673,7 +681,7 @@ pack.addFormula({
       optional: true,
       name: "via",
       description:
-        "Optional. A Twitter username to associate with the Tweet, such as your site’s Twitter account. The provided username will be appended to the end of the Tweet with the text “via @username”. A logged-out Twitter user will be encouraged to sign-in or join Twitter to engage with the via account’s Tweets. The account may be suggested as an account to follow after the user posts a Tweet.",
+        "Optional. A Twitter username to associate with the Tweet. The provided username will be appended to the end of the Tweet. A logged-out Twitter user will be encouraged to sign-in to engage with the via account’s Tweets.",
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -1156,4 +1164,35 @@ pack.addFormula({
   isAction: true,
   // Putting all the write scopes in the same extraOAuth to avoid making you re-auth after you use each action.
   extraOAuthScopes: OAuthScopesReadWrite,
+});
+
+pack.addFormula({
+  name: "ConversationLink",
+  description: "Creates a link to a conversation to another user.",
+
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "otherUserId",
+      description: "ID of the other user to link to.",
+    }),
+  ],
+
+  resultType: coda.ValueType.String,
+  codaType: coda.ValueHintType.Url,
+  connectionRequirement: coda.ConnectionRequirement.Required,
+
+  execute: async function ([otherUserId], context) {
+    // first get the current authenticated user
+    const response = await context.fetcher.fetch({
+      url: apiUrl("/2/users/me"),
+      method: "GET",
+    });
+    const userId = response.body?.data?.id;
+    coda.ensureExists(userId, "Authenticated user not found.");
+
+    return coda.withQueryParams(
+      `https://twitter.com/messages/${userId}-${otherUserId}`
+    );
+  },
 });
