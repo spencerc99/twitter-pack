@@ -851,15 +851,84 @@ async function getUserTimeline(
   };
 }
 
+interface UploadedMediaObject {
+  media_key: string;
+  media_id: number;
+  media_id_string: string;
+  size: number;
+  expires_after_secs: number;
+  preview_image_url: string;
+  image: {
+    image_type: string;
+    w: number;
+    h: number
+  }
+}
+
+/**
+ * @todo Once the v2 media upload is ready I need to migrate this endpoint
+ * @param media
+ * @param context
+ */
+async function uploadMedia (
+    media: coda.ParameterType.Image,
+    context: coda.ExecutionContext,
+    // @ts-ignore
+):  Promise<UploadedMediaObject> {
+/*example response
+{
+  "media_id": 710511363345354753,
+  "media_id_string": "710511363345354753",
+  "media_key": "3_710511363345354753",
+  "size": 11065,
+  "expires_after_secs": 86400,
+  "image": {
+    "image_type": "image/jpeg",
+    "w": 800,
+    "h": 320
+  }
+}
+ */
+  // Download remote image
+  const image = await  context.fetcher.fetch({
+    method: "GET",
+    url: media,
+  });
+
+  const response = await context.fetcher.fetch({
+    method: "POST",
+    url: "https://upload.twitter.com/1.1/media/upload.json",
+    body: image.body,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.body;
+}
+
+/**
+ *
+ * @param tweet
+ * @param media
+ * @param context
+ */
 async function postTweet(
-  [tweet]: any[],
-  context: coda.ExecutionContext
+    [tweet]: any[],
+    context: coda.ExecutionContext,
+    media: coda.ParameterType.Image,
+    // @ts-ignore
 ): Promise<string> {
+
+  // First I need to simpleUpdate the image
+  const image = await uploadMedia(media, context)
+
   const response = await context.fetcher.fetch({
     method: "POST",
     url: apiUrl("/2/tweets"),
     body: JSON.stringify({
       text: tweet,
+      media: [image.media_id],
     }),
     headers: {
       "Content-Type": "application/json",
@@ -922,6 +991,11 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "tweet",
       description: "The tweet to post",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.Image,
+      name: "media",
+      description: "An image to upload, must be lower than 5MB"
     }),
   ],
   execute: postTweet,
