@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "@codahq/packs-sdk": "0.12.0"
+    "@codahq/packs-sdk": "^1.0.5"
   }
 }

@@ -232,7 +232,7 @@ const mediaSchema = coda.makeObjectSchema({
   featuredProperties: ["mediaKey", "type", "imageUrl"],
 });
 
-const commonTweetSchema: any = {
+const commonTweetSchema: coda.ObjectSchemaDefinition<any, any> = {
   type: coda.ValueType.Object,
   idProperty: "id",
   displayProperty: "text",
@@ -271,6 +271,7 @@ const commonTweetSchema: any = {
     "likeCount",
     "retweetCount",
   ],
+  // imageProperty: 'media[0].imageUrl',
   linkProperty: "url",
 };
 
@@ -1220,13 +1221,19 @@ pack.addFormula({
       name: "otherUserId",
       description: "ID of the other user to link to.",
     }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "text",
+      description: "Text to seed the conversation with",
+      optional: true,
+    }),
   ],
 
   resultType: coda.ValueType.String,
   codaType: coda.ValueHintType.Url,
   connectionRequirement: coda.ConnectionRequirement.Required,
 
-  execute: async function ([otherUserId], context) {
+  execute: async function ([otherUserId, text], context) {
     // first get the current authenticated user
     const response = await context.fetcher.fetch({
       url: apiUrl("/2/users/me"),
@@ -1236,7 +1243,8 @@ pack.addFormula({
     coda.ensureExists(userId, "Authenticated user not found.");
 
     return coda.withQueryParams(
-      `https://twitter.com/messages/${userId}-${otherUserId}`
+      `https://twitter.com/messages/${userId}-${otherUserId}`,
+      text ? { text } : {}
     );
   },
 });
