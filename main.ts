@@ -865,8 +865,7 @@ async function postTweet(
       "Content-Type": "application/json",
     },
   });
-  console.log(JSON.stringify(response.body, null, 2));
-  return "OK";
+  return response.body.data.id;
 }
 
 pack.addSyncTable({
@@ -916,7 +915,7 @@ pack.addColumnFormat({
 pack.addFormula({
   resultType: coda.ValueType.String,
   name: "PostTweet",
-  description: "Post a tweet",
+  description: "Post a tweet. Returns the ID of the new tweet posted",
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
