@@ -409,11 +409,15 @@ function parseDateParameter(date?: Date): [string, string] {
 }
 
 async function getProfileTweets(
-  [userId, lastTweetId, date]: any[],
+  [userId, lastTweetId, date, limit]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
   const [startTime, endTime] = parseDateParameter(date);
+
+  if (limit < 1 && limit > 25) {
+    throw new coda.UserVisibleError("Limit must be between 1 and 25.");
+  }
 
   // found using https://codeofaninja.com/tools/find-twitter-id/
   // TODO: can this be automated if you're using user auth?
@@ -423,7 +427,7 @@ async function getProfileTweets(
     "user.fields": CommonTweetUserFields,
     // for some reason preview_image_url not working?
     "media.fields": CommonTweetMediaFields,
-    max_results: 25,
+    max_results: limit ? limit : 25,
     ...(lastTweetId ? { since_id: lastTweetId } : {}),
     ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
@@ -431,7 +435,6 @@ async function getProfileTweets(
   let url = continuation
     ? (continuation.nextUrl as string)
     : apiUrl(basePath, params);
-  // context.logger.info('continuation: ' + continuation);
 
   const response = await context.fetcher.fetch({ method: "GET", url });
 
@@ -447,6 +450,11 @@ async function getProfileTweets(
         JSON.stringify(response, null, 2)
     );
   }
+
+  if (limit) {
+    return { result: results };
+  }
+
   return {
     result: results || [],
     continuation: nextUrl ? { nextUrl } : undefined,
@@ -454,7 +462,7 @@ async function getProfileTweets(
 }
 
 async function getLikedTweets(
-  [userId, lastTweetId]: any[],
+  [userId, lastTweetId, limit]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
@@ -544,6 +552,14 @@ const lastTweetIdParameter = coda.makeParameter({
   optional: true,
 });
 
+const limitParameter = coda.makeParameter({
+  type: coda.ParameterType.Number,
+  name: "limit",
+  description:
+    "Limit results to a certain number. Used to slowly paginate over information to preserve quotas. Must be between 1 and 25.",
+  optional: true,
+});
+
 const dateParameter = coda.makeParameter({
   type: coda.ParameterType.Date,
   name: "date",
@@ -592,7 +608,12 @@ pack.addSyncTable({
     name: "ProfileTweets",
     description: "Fetches the tweets that for a given user.",
 
-    parameters: [userIdParameter, lastTweetIdParameter, dateParameter],
+    parameters: [
+      userIdParameter,
+      lastTweetIdParameter,
+      dateParameter,
+      limitParameter,
+    ],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
@@ -665,7 +686,7 @@ pack.addFormula({
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
-      name: "draft text",
+      name: "draftText",
       description:
         "The text to seed the draft with. User will be allowed the tweet to modify before posting",
     }),
@@ -686,7 +707,7 @@ pack.addFormula({
     coda.makeParameter({
       type: coda.ParameterType.String,
       optional: true,
-      name: "in reply to",
+      name: "inReplyTo",
       description: "Optional. ID of a tweet to reply to.",
     }),
     coda.makeParameter({
