@@ -260,8 +260,18 @@ const commonTweetSchema: any = {
     media: { type: coda.ValueType.Array, items: mediaSchema },
     url: { type: coda.ValueType.String, codaType: coda.ValueHintType.Url },
     // referencedTweets: {type: coda.ValueType.Array, items: referencedTweetSchema, fromKey: 'referenced_tweets'},
+
+    cardTitle: { type: coda.ValueType.String },
   },
   featuredProperties: ["text", "createdAt", "author", "media"],
+  titleProperty: "cardTitle",
+  snippetProperty: "text",
+  subtitleProperties: [
+    { value: "createdAt", label: "" },
+    "likeCount",
+    "retweetCount",
+  ],
+  linkProperty: "url",
 };
 
 const tweetSchema = coda.makeObjectSchema(commonTweetSchema);
@@ -308,12 +318,25 @@ function parseTweet(
 ) {
   const { users, media } = annotationInfo;
   const mediaKeys = attachments?.media_keys;
-  const author = users?.find((u) => u.id === tweetInfo.author_id);
+  const author = coda.ensureExists(
+    users?.find((u) => u.id === tweetInfo.author_id),
+    `author not found for tweet ${tweetInfo.id}`
+  );
   const mediaForTweet = media?.filter((m) => mediaKeys?.includes(m.media_key));
   const url = author.username
     ? "https://twitter.com/" + author.username + "/status/" + tweetInfo.id
     : undefined;
   const transformedText = parseTweetText(text);
+
+  let cardTitle = `${author.name} (@${author.username})`;
+
+  const maybeInReplyToUser = users?.find(
+    (u) => u.id === tweetInfo.in_reply_to_user_id
+  );
+  if (maybeInReplyToUser) {
+    cardTitle += " replied to @" + maybeInReplyToUser.username;
+  }
+
   return {
     ...tweetInfo,
     text: transformedText,
@@ -321,6 +344,7 @@ function parseTweet(
     author: parseUser(author),
     media: mediaForTweet?.map(parseMedia),
     url,
+    cardTitle,
   };
 }
 
