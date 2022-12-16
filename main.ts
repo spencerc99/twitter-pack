@@ -115,6 +115,7 @@ interface TwitterUser {
   profile_image_url?: string;
   public_metrics?: UserPublicMetrics;
   created_at: string;
+  protected: boolean;
 }
 
 interface TwitterMediaVariant {
@@ -172,6 +173,7 @@ const userSchema = coda.makeObjectSchema({
     tweetCount: { type: coda.ValueType.Number, fromKey: "tweet_count" },
     listedCount: { type: coda.ValueType.Number, fromKey: "listed_count" },
     protected: { type: coda.ValueType.Boolean },
+    cardTitle: { type: coda.ValueType.String },
   },
   featuredProperties: [
     "name",
@@ -181,6 +183,22 @@ const userSchema = coda.makeObjectSchema({
     "url",
     "profileImageUrl",
   ],
+  titleProperty: "cardTitle",
+  snippetProperty: "description",
+  imageProperty: "profileImageUrl",
+  subtitleProperties: [
+    { property: "location", label: `📍 ${coda.PropertyLabelValueTemplate}` },
+    {
+      property: "tweetCount",
+      label: `${coda.PropertyLabelValueTemplate} tweets`,
+    },
+    {
+      property: "followersCount",
+      label: `${coda.PropertyLabelValueTemplate} followers`,
+    },
+    { property: "createdAt", label: "" },
+  ],
+  linkProperty: "url",
 });
 
 const followerSchema = coda.makeObjectSchema({
@@ -267,7 +285,7 @@ const commonTweetSchema: coda.ObjectSchemaDefinition<any, any> = {
   titleProperty: "cardTitle",
   snippetProperty: "text",
   subtitleProperties: [
-    { value: "createdAt", label: "" },
+    { property: "createdAt", label: "" },
     "likeCount",
     "retweetCount",
   ],
@@ -359,11 +377,16 @@ function parseUser(
   { profile_image_url, public_metrics, ...userInfo }: TwitterUser,
   { pinnedTweetId }: UserAnnotationInfo = {}
 ) {
+  let cardTitle = `${userInfo.name} (@${userInfo.username})${
+    userInfo.verified ? " ✅" : ""
+  }`;
+
   return {
     profile_image_url: transformProfileImage(profile_image_url),
     ...userInfo,
     pinnedTweetId,
     ...public_metrics,
+    cardTitle,
   };
 }
 
@@ -669,7 +692,7 @@ pack.addSyncTable({
 });
 
 pack.addFormula({
-  name: "GetUser",
+  name: "User",
   description: "Gets information about a twitter user by handle.",
   parameters: [
     coda.makeParameter({
@@ -687,7 +710,7 @@ pack.addFormula({
 });
 
 pack.addFormula({
-  name: "GetTweet",
+  name: "Tweet",
   description: "Gets information about a tweet by ID or URL.",
   parameters: [
     coda.makeParameter({
@@ -948,13 +971,13 @@ pack.addSyncTable({
 
 pack.addColumnFormat({
   name: "User",
-  formulaName: "GetUser",
+  formulaName: "User",
   matchers: [TweetUserUrlRegex],
 });
 
 pack.addColumnFormat({
   name: "Tweet",
-  formulaName: "GetTweet",
+  formulaName: "Tweet",
   matchers: [TweetUrlRegex],
 });
 
@@ -1247,4 +1270,43 @@ pack.addFormula({
       text ? { text } : {}
     );
   },
+});
+
+// ARCHIVED FORMULAS
+pack.addFormula({
+  name: "GetUser",
+  description: "Gets information about a twitter user by handle.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "handle",
+      description: "The Twitter handle you're interested in (omit the @)",
+    }),
+  ],
+
+  execute: getUser,
+  resultType: coda.ValueType.Object,
+  schema: userSchema,
+  // TODO(spencer): make this optional after fixing bug around column format
+  connectionRequirement: coda.ConnectionRequirement.None,
+  isExperimental: true,
+});
+
+pack.addFormula({
+  name: "GetTweet",
+  description: "Gets information about a tweet by ID or URL.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tweet",
+      description: "the tweet id or URL",
+    }),
+  ],
+
+  execute: getTweet,
+  resultType: coda.ValueType.Object,
+  schema: tweetSchema,
+  // TODO(spencer): make this optional after fixing bug around column format
+  connectionRequirement: coda.ConnectionRequirement.None,
+  isExperimental: true,
 });
