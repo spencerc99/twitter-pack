@@ -289,7 +289,7 @@ const commonTweetSchema: coda.ObjectSchemaDefinition<any, any> = {
     "likeCount",
     "retweetCount",
   ],
-  // imageProperty: 'media[0].imageUrl',
+  imageProperty: "media[0].imageUrl",
   linkProperty: "url",
 };
 
