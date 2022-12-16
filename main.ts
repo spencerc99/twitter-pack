@@ -391,9 +391,10 @@ function parseUser(
 }
 
 // https://twitter.com/spencerc99
-const TweetUserUrlRegex = /^.*twitter\.com\/@?(\w+)\??[^\/]*\/?$/;
+const TweetUserUrlRegex = /^.*twitter\.com\/@?(\w+)\??[^\/]*\/?(\?.*)?$/;
 // https://twitter.com/spencerc99/status/1541857534234984450
-const TweetUrlRegex = /^.*twitter\.com\/@?\w+\/status\/(\d+)\??[^\/]*\/?$/;
+const TweetUrlRegex =
+  /^.*twitter\.com\/@?\w+\/status\/(\d+)\??[^\/]*\/?(\?.*)?$/;
 const TwitterHandleRegex = /^\w+$/;
 
 async function getTweet(
