@@ -458,7 +458,7 @@ function parseDateParameter(date?: Date): [string, string] {
 }
 
 async function getProfileTweets(
-  [userId, lastTweetId, date, limit]: any[],
+  [userId, newestTweetId, date, limit, oldestTweetId]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
@@ -477,7 +477,8 @@ async function getProfileTweets(
     // for some reason preview_image_url not working?
     "media.fields": CommonTweetMediaFields,
     max_results: limit ? limit : 25,
-    ...(lastTweetId ? { since_id: lastTweetId } : {}),
+    ...(newestTweetId ? { since_id: newestTweetId } : {}),
+    ...(oldestTweetId ? { until_id: oldestTweetId } : {}),
     ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
   const basePath = `/2/users/${userId}/tweets`;
