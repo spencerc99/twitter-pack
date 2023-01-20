@@ -593,11 +593,19 @@ const queryParameter = coda.makeParameter({
     "The query for a Twitter search. See https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query for more info on how to build a query",
 });
 
-const lastTweetIdParameter = coda.makeParameter({
+const newestTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
-  name: "lastTweetId",
+  name: "newestTweetId",
   description:
-    'The ID of a tweet to filter results to only show results after. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
+    'The ID of a tweet to filter results to only show results AFTER this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
+  optional: true,
+});
+
+const oldestTweetIdParameter = coda.makeParameter({
+  type: coda.ParameterType.String,
+  name: "oldestTweetId",
+  description:
+    'The ID of a tweet to filter results to only show results BEFORE this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
 });
 
@@ -632,7 +640,11 @@ pack.addSyncTable({
     name: "LikedTweets",
     description: "Fetches the tweets that a given user has liked.",
 
-    parameters: [userIdParameter, lastTweetIdParameter],
+    parameters: [
+      userIdParameter,
+      newestTweetIdParameter,
+      oldestTweetIdParameter,
+    ],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
@@ -659,9 +671,10 @@ pack.addSyncTable({
 
     parameters: [
       userIdParameter,
-      lastTweetIdParameter,
+      newestTweetIdParameter,
       dateParameter,
       limitParameter,
+      oldestTweetIdParameter,
     ],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
