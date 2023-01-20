@@ -703,7 +703,7 @@
     "@aws-sdk/util-buffer-from" "3.208.0"
     tslib "^2.3.1"
 
-"@codahq/packs-sdk@^1.2.2":
+"@codahq/packs-sdk@^1.2.3":
   version "1.2.3"
   resolved "https://registry.yarnpkg.com/@codahq/packs-sdk/-/packs-sdk-1.2.3.tgz#4f379b852d06ca03f2badc52b659d02367f37e61"
   integrity sha512-hdH7e9TKoMj6bheGKTs92HFOA2pW8SzHgEnTJ228D+LktWW3wsGr5BiK34Qudvp9omlLyk03U+/z38/GiGH0JA==
