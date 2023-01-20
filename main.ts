@@ -458,7 +458,7 @@ function parseDateParameter(date?: Date): [string, string] {
 }
 
 async function getProfileTweets(
-  [userId, newestTweetId, date, limit, oldestTweetId]: any[],
+  [userId, oldestTweetId, date, limit, newestTweetId]: any[],
   context: coda.ExecutionContext,
   continuation: coda.Continuation | undefined
 ) {
@@ -477,8 +477,8 @@ async function getProfileTweets(
     // for some reason preview_image_url not working?
     "media.fields": CommonTweetMediaFields,
     max_results: limit ? limit : 25,
-    ...(newestTweetId ? { since_id: newestTweetId } : {}),
-    ...(oldestTweetId ? { until_id: oldestTweetId } : {}),
+    ...(newestTweetId ? { until_id: newestTweetId } : {}),
+    ...(oldestTweetId ? { since_id: oldestTweetId } : {}),
     ...(startTime ? { end_time: endTime, start_time: startTime } : {}),
   };
   const basePath = `/2/users/${userId}/tweets`;
@@ -594,19 +594,19 @@ const queryParameter = coda.makeParameter({
     "The query for a Twitter search. See https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query for more info on how to build a query",
 });
 
-const newestTweetIdParameter = coda.makeParameter({
-  type: coda.ParameterType.String,
-  name: "newestTweetId",
-  description:
-    'The ID of a tweet to filter results to only show results AFTER this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
-  optional: true,
-});
-
 const oldestTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "oldestTweetId",
   description:
-    'The ID of a tweet to filter results to only show results BEFORE this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
+    'The ID of a tweet to filter results to only show results posted AFTER this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
+  optional: true,
+});
+
+const newestTweetIdParameter = coda.makeParameter({
+  type: coda.ParameterType.String,
+  name: "newestTweetId",
+  description:
+    'The ID of a tweet to filter results to only show results posted BEFORE this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
 });
 
@@ -643,8 +643,8 @@ pack.addSyncTable({
 
     parameters: [
       userIdParameter,
-      newestTweetIdParameter,
       oldestTweetIdParameter,
+      newestTweetIdParameter,
     ],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
@@ -672,10 +672,10 @@ pack.addSyncTable({
 
     parameters: [
       userIdParameter,
-      newestTweetIdParameter,
+      oldestTweetIdParameter,
       dateParameter,
       limitParameter,
-      oldestTweetIdParameter,
+      newestTweetIdParameter,
     ],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
