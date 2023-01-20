@@ -550,36 +550,6 @@ async function getLikedTweets(
   };
 }
 
-async function getSearchTweets(
-  [query, mode]: any[],
-  context: coda.ExecutionContext,
-  continuation: coda.Continuation | undefined
-) {
-  const params = {
-    expansions: CommonTweetExpansions,
-    "tweet.fields": CommonTweetFields,
-    "user.fields": CommonTweetUserFields,
-    "media.fields": CommonTweetMediaFields,
-    query,
-    max_results: 20,
-  };
-  const basePath = `/2/tweets/search/recent`;
-  let url = continuation
-    ? (continuation.nextUrl as string)
-    : apiUrl(basePath, params);
-
-  const response = await context.fetcher.fetch({ method: "GET", url });
-
-  const { data, includes } = response.body;
-  const annotationInfo = includes;
-  const results = data?.map((rawTweet) => parseTweet(rawTweet, annotationInfo));
-  const nextUrl = nextUrlFromResponse(basePath, params, response);
-  return {
-    result: results || [],
-    continuation: nextUrl ? { nextUrl } : undefined,
-  };
-}
-
 const userIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
   name: "userId",
@@ -683,26 +653,6 @@ pack.addSyncTable({
       getProfileTweets(params, context, context.sync.continuation),
   },
   // This indicates whether or not your sync table requires an account connection.
-  connectionRequirement: coda.ConnectionRequirement.None,
-});
-
-pack.addSyncTable({
-  name: "SearchTweets",
-  identityName: "SearchTweet",
-  schema: coda.makeObjectSchema({
-    ...commonTweetSchema,
-    displayProperty: "url",
-    identity: { name: "SearchTweet" },
-  }),
-  formula: {
-    name: "SearchTweets",
-    description: "Fetches tweets for a given search query.",
-
-    parameters: [queryParameter],
-
-    execute: (params, context) =>
-      getSearchTweets(params, context, context.sync.continuation),
-  },
   connectionRequirement: coda.ConnectionRequirement.None,
 });
 
@@ -904,37 +854,6 @@ async function getBookmarks(
   };
 }
 
-async function getUserTimeline(
-  [id]: any[],
-  context: coda.ExecutionContext,
-  continuation: coda.Continuation | undefined
-) {
-  const params = {
-    expansions: CommonTweetExpansions,
-    "tweet.fields": CommonTweetFields,
-    "user.fields": CommonTweetUserFields,
-    "media.fields": CommonTweetMediaFields,
-  };
-  const basePath = `/2/users/${id}/timelines/reverse_chronological`;
-  let url = continuation
-    ? (continuation.nextUrl as string)
-    : apiUrl(basePath, params);
-
-  const response = await context.fetcher.fetch({ method: "GET", url });
-
-  const { data, includes } = response.body;
-  const annotationInfo = includes;
-  const results = data?.map((rawBookmark) =>
-    parseTweet(rawBookmark, annotationInfo)
-  );
-
-  const nextUrl = nextUrlFromResponse(basePath, params, response);
-  return {
-    result: results || [],
-    continuation: nextUrl ? { nextUrl } : undefined,
-  };
-}
-
 async function postTweet(
   [tweet]: any[],
   context: coda.ExecutionContext
@@ -1072,36 +991,6 @@ pack.addSyncTable({
       coda.ensureExists(userId, "Authenticated user not found.");
 
       return getBookmarks([userId], context, context.sync.continuation);
-    },
-  },
-  connectionRequirement: coda.ConnectionRequirement.Required,
-});
-
-pack.addSyncTable({
-  name: "UserTimeline",
-  identityName: "UserTimeline",
-  schema: coda.makeObjectSchema({
-    ...commonTweetSchema,
-    displayProperty: "url",
-    identity: { name: "UserTimeline" },
-  }),
-  formula: {
-    name: "UserTimeline",
-    description:
-      "Fetches the reverse chronological timeline for the authenticated user.",
-
-    parameters: [],
-
-    execute: async (_params, context) => {
-      // first get the current authenticated user
-      const response = await context.fetcher.fetch({
-        url: apiUrl("/2/users/me"),
-        method: "GET",
-      });
-      const userId = response.body?.data?.id;
-      coda.ensureExists(userId, "Authenticated user not found.");
-
-      return getUserTimeline([userId], context, context.sync.continuation);
     },
   },
   connectionRequirement: coda.ConnectionRequirement.Required,
@@ -1324,4 +1213,62 @@ pack.addFormula({
   // TODO(spencer): make this optional after fixing bug around column format
   connectionRequirement: coda.ConnectionRequirement.None,
   isExperimental: true,
+});
+
+/**
+ * DEPRECATED SYNC TABLES
+ */
+pack.addSyncTable({
+  name: "SearchTweets",
+  identityName: "SearchTweet",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "SearchTweet" },
+  }),
+  formula: {
+    name: "SearchTweets",
+    description: "Fetches tweets for a given search query.",
+
+    parameters: [queryParameter],
+
+    execute: (params, context) => {
+      throw new coda.UserVisibleError(
+        "This sync table is deprecated due to Twitter API search limits. I'm working on a new way to support this given the constraints. If interested, contact me at spencerc99@gmail.com"
+      );
+    },
+  },
+  connectionRequirement: coda.ConnectionRequirement.None,
+});
+
+pack.addSyncTable({
+  name: "UserTimeline",
+  identityName: "UserTimeline",
+  schema: coda.makeObjectSchema({
+    ...commonTweetSchema,
+    displayProperty: "url",
+    identity: { name: "UserTimeline" },
+  }),
+  formula: {
+    name: "UserTimeline",
+    description:
+      "Fetches the reverse chronological timeline for the authenticated user.",
+
+    parameters: [],
+
+    execute: async (_params, context) => {
+      // first get the current authenticated user
+      const response = await context.fetcher.fetch({
+        url: apiUrl("/2/users/me"),
+        method: "GET",
+      });
+      const userId = response.body?.data?.id;
+      coda.ensureExists(userId, "Authenticated user not found.");
+
+      throw new coda.UserVisibleError(
+        "This sync table is deprecated due to Twitter API search limits. I'm working on a new way to support this given the constraints. If interested, contact me at spencerc99@gmail.com"
+      );
+    },
+  },
+  connectionRequirement: coda.ConnectionRequirement.Required,
 });
