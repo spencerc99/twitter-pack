@@ -566,7 +566,7 @@ const queryParameter = coda.makeParameter({
 
 const oldestTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
-  name: "oldestTweetId",
+  name: "lastTweetId",
   description:
     'The ID of a tweet to filter results to only show results posted AFTER this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
