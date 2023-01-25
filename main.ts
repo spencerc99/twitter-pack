@@ -566,7 +566,7 @@ const queryParameter = coda.makeParameter({
 
 const oldestTweetIdParameter = coda.makeParameter({
   type: coda.ParameterType.String,
-  name: "lastTweetId",
+  name: "oldestTweetId",
   description:
     'The ID of a tweet to filter results to only show results posted AFTER this tweet. If not provided, the function will sync everything which is performance intensive. Recommended used with "keep unsynced rows" on to avoid rate limiting of your doc.',
   optional: true,
@@ -611,11 +611,7 @@ pack.addSyncTable({
     name: "LikedTweets",
     description: "Fetches the tweets that a given user has liked.",
 
-    parameters: [
-      userIdParameter,
-      oldestTweetIdParameter,
-      newestTweetIdParameter,
-    ],
+    parameters: [userIdParameter, oldestTweetIdParameter],
 
     // Everything inside this statement will execute anytime your Coda function is called in a doc.
     execute: (params, context) =>
